@@ -1,0 +1,951 @@
+//分かんないところはきいてください。
+
+/*注意　これはmbed(arduinoみたいなマイコンの一種)用に書かれています。arduinoはarduinoリファレンス「http://www.musashinodenpa.com/arduino/ref/」などを参考にしてください。*/
+/* 自動モードが入っているので煩雑になっています。単純なプログラムなどはdevice plusの第11回 Arduinoでモーターを制御する！（その１）モーターの基本を勉強してみる。http://deviceplus.jp/hobby/entry011/を参考にしてみてください。*/
+/*たとえばPS.BUTTON.BIT.SELECT == 1 && PS.PREV.BUTTON.BIT.SELECT == 0はselectボタンが前のループでは押されてなくて今回押されたとき(つまり押された瞬間)を表す。
+/*PWMX　に値(0～1)を代入するとモーターが回り出す。0.5で停止、0～0.5で正回転、0.5～1.0で逆回転→MD(モータードライバ)によって違う
+/*今回使う予定のMDのコマンド
+irf3205使用MD
+https://ja.aliexpress.com/item/New-3-36V-Dual-15A-H-Bridge-DC-Motor-Driver-Peak-30A-IRF3205-for-Robot-Smart/32695422278.html?spm=2114.52010608.4.2.poHSBP
+dirはデジタル入力ピン→arduinoではdigitalWrite、pwmはアナログ入力ピン→arduinoではanalogWrite
+モーター正:　dir = 1 pwm = pwm
+モーター逆: dir = 0 pwm = pwm
+ストップブレーキ: dir = 任意 pwm = 0*/
+/*サーボモーターは使っていません。サーボの制御はhttp://deviceplus.jp/hobby/entry057/を参考に*/
+
+//エンコーダの値は100で2mmほど、エンコーダ…モーターの角度を検出する装置
+#include <mbed.h>//mbed…arduinoみたいなもの、mbed用の標準ライブラリ
+#include <init.h>//mbed用の自作mainboardを使うためのライブラリ
+#include <pspad.h>//pspadを動かすためのライブラリ
+
+#define Motor_x PWM0
+#define Motor_y PWM1
+#define Motor_z PWM2
+#define Motor_L PWM3
+#define x_min
+#define x_max
+#define y_min
+#define y_max 1847
+#define z_min 0
+#define z_max 2213
+#define K_tr 0.008
+#define cycle 0.01
+#define K 1
+#define K_d 1
+#define Kp 1
+#define Ki 0.8
+#define led led0
+#define ac_led led1
+
+Pspad PS(p15,p16,p17,p30);
+/*エンコーダの関数*/
+QEI ENC_X(p5,p6,NC,624,QEI::X4_ENCODING);
+QEI ENC_Y(p7,p8,NC,624,QEI::X4_ENCODING);
+QEI ENC_Z(p9,p10,NC,624,QEI::X4_ENCODING);
+
+/*mbedの関数*/
+DigitalOut Arm(p11),LED_mode(p28),LED_auto(p27);
+DigitalIn z_switch_down(p18);
+DigitalIn z_switch_up(p19);
+double TrapeStop(double mt, int enc_max, int enc_min);
+
+double PID(int aim_max, int aim_min, double MO, int enc);
+double PID_x(int aim_max, int aim_min, double MO, int enc);
+double PID_y(int aim_max, int aim_min, double MO, int ENC);
+
+void Trape(double mt, PwmOut motor);  //台形加速用の関数
+double Trape_(double mt , PwmOut motor);
+
+void auto_move(int aim_x,int aim_y);
+void manual_leave();
+
+double Rx,Ry,Lx,Ly,mt_x,mt_y,mt_z,mt_l;    //pspadのアナログスティックの値とモーターの目標値を入れる変数
+int enc_x,enc_y,enc_z,enc_z_old;             //エンコーダーの値を入れる変数
+int AIM_x,AIM_y,x_zero = -342,incre_x = 0,incre_y = 0;
+int move_x = 0, move_y = 1100, box_x = -342,box_y = 20,prebox_x,prebox_y;//y = 1300
+//int cond_move_x = 648,cond_move_y = 0;
+int cond_move_x = 3140,cond_move_y = 1326;//1386 //x = -1296
+int enc_pre_x[10],enc_pre_y[10],enc_flag_x = 0,enc_flag_y = 0;
+
+Timer t_sw;
+Timer leave;
+
+bool auto_mode = false;               //自動モードの切り替え用変数
+bool mode_arm = false;
+bool move_mode = false;
+bool manual_mode = false;
+bool catch_flag = 0;
+
+void auto_catch();
+bool ac_mode = false;
+bool leave_flag = false;
+int ac_flag = 1;
+//int z_switch_down = 0;
+int move_flag_x = 0,move_flag_y = 0,duty_flag = 0,state = 0,Skip_flag = 0;
+Timer ac_timer,Stop;
+
+int main() {
+    pc.baud(921600);
+
+    InitBoard();
+
+    Motor_x.period_us(50);//PWMの周期
+    Motor_y.period_us(50);
+    Motor_z.period_us(50);
+    Motor_L.period_us(50);
+
+    Motor_x = 0.5;//ここでは0.5で停止、0～0.5で正回転、0.5～1.0で逆回転
+    Motor_y = 0.5;
+    Motor_z = 0.5;
+    Motor_L = 0.5;
+
+    z_switch_up.mode(PullDown);
+    z_switch_down.mode(PullDown);
+
+    ENC_X.reset();
+    ENC_Y.reset();
+    ENC_Z.reset();
+
+    Arm = mode_arm;
+
+    ac_timer.stop();
+    ac_timer.reset();
+
+    leave.stop();
+    leave.reset();
+    leave.start();
+
+    t_sw.stop();
+    t_sw.reset();
+
+    Stop.stop();
+    Stop.reset();
+
+    AIM_x = move_x;
+    AIM_y = move_y;
+
+    LED_mode = 0;
+    LED_auto = 0;
+
+    for(int i = 0; i< 10; i++) enc_pre_x[i] = enc_pre_y[i] = i;
+    while(1) {
+        AdjustCycle(10000);
+        PS.PsRead();
+
+        enc_x = ENC_X.getPulses();
+        enc_y = ENC_Y.getPulses();
+        enc_z = ENC_Z.getPulses();
+
+        Rx = PS.right_x;
+        Ry = PS.right_y;
+        Lx = PS.left_x;
+        Ly = PS.left_y;
+
+        if(fabs(Lx) <= 50) Lx = 0;
+        if(fabs(Ly) <= 50) Ly = 0;
+
+        if(auto_mode == false){
+            led = 0;
+            if(fabs(Lx)  != 0 ||fabs(Ly) != 0){        //アナログスティックでx,yを同時に動かす
+                mt_x = 0.5 + Lx / 380;
+                mt_y = 0.5 - Ly / 380;
+            }
+            else if(PS.BUTTON.BIT.UP == 1){            //十字キーでx,y方向の微調整
+                mt_y = 0.35;
+            }
+            else if(PS.BUTTON.BIT.DOWN == 1){
+                mt_y = 0.65;
+            }
+            else if(PS.BUTTON.BIT.LEFT == 1){
+                mt_x = 0.35;
+            }
+            else if(PS.BUTTON.BIT.RIGHT == 1){
+                mt_x = 0.65;
+            }
+            else{
+                mt_x = 0.5;
+                mt_y = 0.5;
+                mt_z = 0.5;
+            }
+
+            if(PS.BUTTON.BIT.SELECT == 1 && PS.PREV.BUTTON.BIT.SELECT == 0){
+            	PS.Vib(1);
+                ENC_X.reset();
+                ENC_Y.reset();
+                ENC_Z.reset();
+            }
+
+            if(z_switch_up == 1 && PS.BUTTON.BIT.SANKAKU == 1){
+                mt_z = 0.5;
+            }
+            else if(PS.BUTTON.BIT.SANKAKU == 1){
+                mt_z = 0.65;
+            }
+            else if(PS.BUTTON.BIT.BATU == 1){
+                mt_z = 0.35;
+            }
+
+            if(PS.BUTTON.BIT.SIKAKU == 1 && PS.PREV.BUTTON.BIT.SIKAKU == 0){
+                mode_arm = !mode_arm;
+            }
+
+            if(PS.BUTTON.BIT.START == 1 && PS.PREV.BUTTON.BIT.START == 0){ //自動モードの初期化
+                PS.Vib(0.5);
+                ac_mode = false;
+                move_mode = false;
+                move_flag_x = 0;
+                move_flag_y = 0;
+                duty_flag = 0;
+                state = 0;
+                move_x = 0;
+                move_y = 1300;
+                cond_move_x = -1296;
+                cond_move_y = 1406;
+                box_x = -342;
+                box_y = 20;
+                AIM_x = move_x;
+                AIM_y = move_y;
+                mode_arm = false;
+                ac_flag = 1;
+                leave_flag = false;
+                ac_timer.stop();
+                ac_timer.reset();
+                leave.stop();
+                leave.reset();
+                leave.start();
+                Stop.stop();
+                Stop.reset();
+                manual_mode = false;
+            }
+
+
+            Trape(mt_x, Motor_x);            //dutyの書き込み
+            Trape(mt_y, Motor_y);
+            Trape(mt_z, Motor_z);
+            Motor_L = mt_l;
+            Arm = mode_arm;
+        }//auto_mode=falseの時
+
+/************************************自動モード****************************************/
+        else if(auto_mode == true){
+            led = 1;
+
+            if(manual_mode == true){
+                manual_leave();
+            }
+            else if(ac_mode == true){
+                auto_catch();
+            }
+            else if(move_mode == true){
+                auto_move(AIM_x,AIM_y);
+            }
+/*            else if(PS.BUTTON.BIT.SANKAKU == 1){
+                mt_z = 0.7;
+                mt_z = PID(z_max, z_min, mt_z, enc_z);
+            }
+            else if(PS.BUTTON.BIT.BATU == 1){
+                mt_z = 0.3;
+                mt_z = PID(z_max, z_min, mt_z, enc_z);
+                if(enc_z >= 1900){
+                    mt_z = 0.45;
+                }
+            }*/
+            else{
+                mt_x = 0.5;
+                mt_y = 0.5;
+                mt_z = 0.5;
+            }
+
+            if(PS.BUTTON.BIT.R1 == 1 && PS.PREV.BUTTON.BIT.R1 == 0 && manual_mode == false && move_mode == false){   //auto_catch start
+                ac_mode = !ac_mode;
+                catch_flag = 1;
+            }
+
+            if(PS.BUTTON.BIT.UP == 1 && PS.PREV.BUTTON.BIT.UP == 0 && manual_mode == false){
+                move_mode = !move_mode;
+            }
+
+            if(PS.BUTTON.BIT.SANKAKU == 1 && PS.PREV.BUTTON.BIT.SANKAKU == 0){
+                if(move_mode == true && leave_flag == true){
+                    Stop.start();
+                }
+            }
+
+            if(PS.BUTTON.BIT.BATU == 1 && PS.PREV.BUTTON.BIT.BATU == 0){
+            	if(move_mode == true && leave_flag == true){
+            		Stop.start();
+            		Skip_flag = 1;
+            	}
+            }
+
+/*            if(PS.BUTTON.BIT.L1 == 1 && PS.PREV.BUTTON.BIT.L1 == 0){
+            	z_switch_down = 1;
+            }
+            else z_switch_down = 0;*/
+
+            if(z_switch_up == 1 && mt_z > 0.5)mt_z = 0.5;
+
+            mt_x = Trape_(mt_x,Motor_x);
+            mt_y = Trape_(mt_y,Motor_y);
+            mt_z = Trape_(mt_z,Motor_z);
+
+            Motor_x = Limit_d(mt_x, 0.86, 0.14); //最大、最少を変更
+            Motor_y = Limit_d(mt_y, 0.86, 0.14);
+            Motor_z = Limit_d(mt_z, 0.86, 0.14);
+            Arm = mode_arm;
+        }//auto_mode=trueの時
+
+        if(auto_mode == true)LED_mode = 1;
+        else LED_mode = 0;
+
+        if(move_mode == true || ac_mode == true)LED_auto = 1;
+        else LED_auto = 0;
+
+        if(PS.BUTTON.BIT.MARU == 1 && PS.PREV.BUTTON.BIT.MARU == 0){   //モード変換
+            auto_mode = !auto_mode;
+            if(auto_mode == true)PS.Vib(1);
+            if(auto_mode == false)PS.Vib(0.3);
+            PID(0,0,0,0);
+            PID_x(0,0,0,0);
+            PID_y(0,0,0,0);
+            move_flag_x = 0;
+            move_flag_y = 0;
+            duty_flag = 0;
+        }
+
+        if(ac_mode == false && ac_led == 1){
+            ac_led = 0;
+            auto_mode = false;
+        }
+
+//        pc.printf("VIB = %d MARU = %d Arm = %d\r\n",PS.VIBRATE,PS.BUTTON.BIT.MARU,Arm.read());
+        pc.printf("motor_x = %f, motor_y = %f motor_z = %f ,state = %d ",Motor_x.read(),Motor_y.read(),Motor_z.read(),state);
+//        pc.printf("mt_x = %f mt_y = %f mt_z = %f\r\n",mt_x,mt_y,mt_z);
+        pc.printf("enc_x = %d enc_y = %d enc_z = %d switch_up = %d  switch_down = %d arm = %d AIM_x = %d AIM_y = %d\r\n",enc_x,enc_y,enc_z,z_switch_up.read(),z_switch_down.read(),Arm.read(),AIM_x,AIM_y);
+    }
+}//main関数
+
+/***********************************関数群***************************************/
+
+void Trape(double mt , PwmOut motor){             //台形加減速用の関数  引数:(dutyの目標値 , モーター)
+    double mt_pre = motor.read(), diff;
+    diff = mt - motor.read();
+
+    if(diff != 0){
+        if     (diff < 0) mt_pre -= K_tr;
+        else if(diff > 0) mt_pre += K_tr;
+    }
+
+    if(fabs(diff) < 0.008){
+        mt_pre = mt;
+    }
+
+    motor = Limit_d(mt_pre,0.9,0.1);
+}
+
+double Trape_(double mt , PwmOut motor){             //台形加速用の関数  引数:(dutyの目標値 , モーター)
+    double mt_pre = motor.read(), diff;
+    diff = mt - motor.read();
+
+    if(diff != 0){
+        if     (diff < 0) mt_pre -= 0.02;//0.005から
+        else if(diff > 0) mt_pre += 0.02;
+    }
+
+    if(fabs(diff) < 0.02){//ここも
+        mt_pre = mt;
+    }
+
+    if(mt_pre > mt && mt > 0.5){
+        mt_pre = mt;
+    }
+    else if(mt > mt_pre && mt < 0.5){
+        mt_pre = mt;
+    }
+
+    if(mt == 0.5)mt_pre = 0.5;
+
+    return mt_pre;
+}
+
+double TrapeStop(double mt, int enc_max, int enc_min){ //無視しといてください
+    }
+
+
+double PID(int aim_max, int aim_min, double MO, int ENC){
+    static double enc[2], pre_enc[2], integ[] = {0,0};
+    if(aim_max == 0 && aim_min == 0 && MO == 0 && ENC == 0){//引数すべて0で累積値を初期化
+        integ[0] = 0;
+        integ[1] = 0;
+        return 0;
+    }
+
+    pre_enc[0] = enc[0];
+    enc[0] = (aim_max - ENC) * 0.00015;
+
+    pre_enc[1] = enc[1];
+    enc[1] = (aim_min - ENC) * 0.00015;
+
+    integ[0] += (enc[0] * K + pre_enc[0] * K) / 2 * cycle * 0.01;
+    integ[1] += (enc[1] * K_d + pre_enc[1] * K_d) / 2 * cycle * 0.01;
+
+    if(MO <= 0.5){
+        MO = 0.45 - (Kp * enc[0]) - (Ki * integ[0]);//- (Kd * (enc - pre_enc) / cycle * 0.000001);
+    }
+
+    if(MO >= 0.5){
+        MO = 0.55 - (Kp * enc[1]) - (Ki * integ[1]);//- (Kd * (enc - pre_enc) / cycle * 0.000001);
+    }
+
+    if(MO < 0.55 && MO > 0.45){
+        integ[0] = 0;
+        integ[1] = 0;
+    }
+
+    return MO;
+}
+
+double PID_y(int aim_max, int aim_min, double MO, int ENC){
+    static double enc[2], pre_enc[2], integ[] = {0,0};
+
+    if(aim_max == 0 && aim_min == 0 && MO == 0 && ENC == 0){
+        integ[0] = 0;
+        integ[1] = 0;
+        return 0;
+    }
+
+    pre_enc[0] = enc[0];
+    enc[0] = (aim_max - ENC) * 0.00015;
+
+    pre_enc[1] = enc[1];
+    enc[1] = (aim_min - ENC) * 0.00015;
+
+    integ[0] += (enc[0] * K + pre_enc[0] * K) / 2 * cycle * 0.01;
+    integ[1] += (enc[1] * K_d + pre_enc[1] * K_d) / 2 * cycle * 0.01;
+
+    if(MO <= 0.5){
+        MO = 0.435 - (Kp * enc[0]) - (Ki * integ[0]);//- (Kd * (enc - pre_enc) / cycle * 0.000001);
+    }
+
+    if(MO >= 0.5){
+        MO = 0.55 - (Kp * enc[1]) - (Ki * integ[1]);//- (Kd * (enc - pre_enc) / cycle * 0.000001);
+    }
+
+    if(MO <= 0.55 && MO >= 0.45){
+        integ[0] = integ[1] = 0;
+    }
+
+    return MO;
+}
+
+double PID_x(int aim_max, int aim_min, double MO, int ENC){
+    static double enc[2], pre_enc[2], integ[] = {0,0};
+
+    if(aim_max == 0 && aim_min == 0 && MO == 0 && ENC == 0){
+        integ[0] = 0;
+        integ[1] = 0;
+        return 0;
+    }
+
+    pre_enc[0] = enc[0];
+    enc[0] = (aim_min - ENC) * 0.00015;
+
+    pre_enc[1] = enc[1];
+    enc[1] = (aim_max - ENC) * 0.00015;
+
+    integ[0] += (enc[0] * K + pre_enc[0] * K) / 2 * cycle * 0.01;
+    integ[1] += (enc[1] * K_d + pre_enc[1] * K_d) / 2 * cycle * 0.01;
+
+    if(MO <= 0.5){
+        MO = 0.45 + (Kp * enc[0]) + (Ki * integ[0]);//- (Kd * (enc - pre_enc) / cycle * 0.000001);
+    }
+
+    if(MO >= 0.5){
+        MO = 0.55 + (Kp * enc[1]) + (Ki * integ[1]);//- (Kd * (enc - pre_enc) / cycle * 0.000001);
+    }
+
+    if(MO <= 0.55 && MO >= 0.45){
+        integ[0] = integ[1] = 0;
+    }
+    return MO;
+}
+
+void auto_catch(){
+    duty_flag = 0;
+    ac_led = 1;
+    switch(ac_flag){
+        case 1:
+            mode_arm = false;
+            mt_z = 0.4;
+            mt_z = PID(z_max + 25, z_min, mt_z, enc_z);
+            if(z_switch_down == 1 && enc_z >= 1500){
+                ac_flag = 2;
+                ac_timer.start();
+                mt_z = 0.47;
+                t_sw.stop();
+                t_sw.reset();
+                }
+            else if(z_switch_down == 0 && enc_z >= 1500 && t_sw.read() == 0){
+                mt_z = 0.47;
+                t_sw.start();
+            }
+            else if(t_sw.read() < 0.5 && t_sw.read() != 0)mt_z = 0.46;
+            else if(t_sw.read() < 1 && t_sw.read() != 0)mt_z = 0.45;
+            else if(t_sw.read() >= 1)mt_z = 0.44;
+
+            break;
+
+        case 2:
+            mode_arm = false;
+            mt_z = 0.46;
+            if(ac_timer.read() >= 0.2 && ac_timer.read() < 0.5){
+            	mode_arm = true;
+            }
+            else if(ac_timer.read() >= 0.5 ){
+                ac_flag = 3;
+                mode_arm = true;
+                ac_timer.stop();
+                ac_timer.reset();
+                }
+            break;
+
+        case 3:
+            mode_arm = true;
+            mt_z = 0.7;
+            mt_z = PID(z_max, z_min, mt_z, enc_z);
+            if(enc_z <= 700){
+                mt_z = 0.62;
+            }
+
+            if(z_switch_up.read() == 1 && enc_z <= 700){
+                //pc.printf("ac_mode_end\r\n");
+                mt_z = 0.5;
+                ac_flag = 1;
+                ac_led = 0;
+                ac_mode = false;
+                if(catch_flag == 0) move_mode = true;
+                else if(catch_flag == 1) move_mode = false;
+                catch_flag = 0;
+                }
+            break;
+
+         default:
+            mt_z = 0.5;
+            }
+    }
+
+void auto_move(int aim_x,int aim_y){
+    static double duty_x,duty_y;
+
+    if(leave.read() <= 0.3)return;
+
+    if(Stop.read() > 0 && Stop.read() <= 0.5){
+        mt_x = 0.5;
+        mt_y = 0.5;
+        mt_z = 0.62;
+        return;
+    }
+    else if(Stop.read() > 0.5){
+        leave_flag = !leave_flag;
+        mode_arm = !mode_arm;
+        duty_flag = 0;
+        move_flag_x = 0;
+        move_flag_y = 0;
+        AIM_x = move_x;
+        AIM_y = move_y;
+        Stop.stop();
+        Stop.reset();
+        if(Skip_flag == 1){
+            move_x = move_x + cond_move_x;
+            AIM_x = move_x;
+            move_y = move_y + cond_move_y;
+            AIM_y = move_y;
+            state++;
+            duty_flag = 0;
+            if(state == 1){
+                cond_move_x = -4536;
+                cond_move_y = 0;
+            }
+            if(state == 2){
+                cond_move_x = 648;
+            }
+            if(state == 5){
+                cond_move_x = 0;
+                cond_move_y = -618;
+            }
+            if(state == 6){
+                cond_move_x = -648;
+                cond_move_y = 0;
+            }
+            if(state == 9){
+                cond_move_x = 2592;
+                cond_move_y = 618;
+            }
+            if(state == 10){
+                cond_move_x = 648;
+                cond_move_y = 0;
+            }
+            if(state == 12){
+                cond_move_y = -638;//618
+            }
+            if(state == 13){
+                cond_move_x = -648;
+                cond_move_y = 0;
+            }
+            if(state == 16){
+                cond_move_x = 648;
+                cond_move_y = -718;//-618
+            }
+            if(state == 17){
+                cond_move_x = -648;
+                cond_move_y = 0;
+            }
+        }
+        else if(Skip_flag == 0){
+        	box_x = prebox_x;
+        	box_y = prebox_y;
+        }
+        PID(0,0,0,0);
+        PID_x(0,0,0,0);
+        PID_y(0,0,0,0);
+        Skip_flag = 0;
+        return;
+    }
+
+
+    if(duty_flag == 0){
+        if(aim_x > enc_x)duty_x = 0.7;
+        else             duty_x = 0.3;
+
+        if(aim_y > enc_y)duty_y = 0.3;
+        else             duty_y = 0.7;
+    }
+
+    if(move_flag_y == 1)mt_y = 0.5;
+    else if(duty_y == 0.3){
+        if(enc_y < aim_y){
+            mt_y = 0.3;
+            mt_y = PID_y(aim_y,0,mt_y,enc_y);
+           /* for(int i = 0; i < 9; i++){
+            	if(enc_pre_y[i] == enc_pre_y[i + 1])enc_flag_y++;
+            }*/
+     	}
+        if(enc_y >= aim_y){
+            mt_y = 0.5;
+            move_flag_y = 1;
+        }
+    }
+    else if(duty_y == 0.7){
+        if(enc_y > aim_y){
+            mt_y = duty_y;
+            mt_y = PID_y(0,aim_y,mt_y,enc_y);
+            /*for(int i = 0; i < 9; i++){
+            	if(enc_pre_y[i] == enc_pre_y[i + 1])enc_flag_y++;
+            }*/
+        }
+        if(enc_y <= aim_y){
+            mt_y = 0.5;
+            move_flag_y = 1;
+        }
+    }//y軸
+
+    if     (move_flag_x == 1)mt_x = 0.5;
+    else if(duty_x == 0.7){
+        if (enc_x < aim_x){
+            mt_x = duty_x;
+            mt_x = PID_x(aim_x,0,mt_x,enc_x);
+            /*for(int i = 0; i < 9; i++){
+            	if(enc_pre_x[i] == enc_pre_x[i + 1])enc_flag_x++;
+            }*/
+        }
+        if(enc_x >= aim_x){
+            mt_x = 0.5;
+            move_flag_x = 1;
+        }
+    }
+    else if(duty_x == 0.3){
+        if (enc_x > aim_x){
+            mt_x = duty_x;
+            mt_x = PID_x(0,aim_x,mt_x,enc_x);
+            /*for(int i = 0; i < 9; i++){
+            	if(enc_pre_x[i] == enc_pre_x[i + 1])enc_flag_x++;
+            }*/
+        }
+        if(enc_x <= aim_x){
+            mt_x = 0.5;
+            move_flag_x = 1;
+        }
+    }
+
+    if(move_flag_x == 0 || move_flag_y == 0)mt_z = 0.62;
+
+        duty_flag = 1;
+
+    if(move_flag_x == 1 && move_flag_y == 1 && leave_flag == false){
+    	enc_flag_x = 0;
+    	enc_flag_y = 0;
+        ac_mode = true;
+        move_mode = false;
+        move_flag_x = 0;
+        move_flag_y = 0;
+        leave_flag = !leave_flag;
+        prebox_x = box_x;
+        prebox_y = box_y;
+        box_x = box_x + incre_x;
+        box_y = box_y + incre_y;
+        AIM_x = box_x;
+        AIM_y = box_y;
+        PID(0,0,0,0);
+        PID_x(0,0,0,0);
+        PID_y(0,0,0,0);
+         if(state == 0){
+              box_x = -2367;
+              box_y = 1992;//2292
+          }
+          else if(state == 1){
+              //incre_x = -150;
+          }
+          else if(state == 5){
+              //incre_x = 150;
+          }
+          else if(state == 8){
+              box_x = 4459;
+              box_y = 2092;
+              incre_x = 0;
+          }
+          else if(state == 9){
+              //incre_x = 150;
+          }
+          else if(state == 13){
+              //incre_x = -150;
+          }
+          else if(state == 16){
+              box_x = -342 + 2485;
+              box_y = 10;
+              incre_x = 0;
+          }
+          else if(state == 18){
+              box_x = box_x - 2485;//2685から
+          }
+/*        if(state == 0){
+            box_x = 4459;
+            box_y = 2292;
+        }
+        else if(state == 1){
+            incre_x = 150;
+        }
+        else if(state == 5){
+            incre_x = -150;
+        }
+        else if(state == 8){
+            box_x = -2367;
+            box_y = 2192;
+            incre_x = 0;
+        }
+        else if(state == 9){
+            incre_x = -150;
+        }
+        else if(state == 13){
+            incre_x = 150;
+        }
+        else if(state == 16){
+            box_x = -342;
+            box_y = 10;
+            incre_x = 0;
+        }
+        else if(state == 17){
+            box_x = box_x + 2485;//2685から
+        }*/
+/*        if(state == 1){
+            box_x = box_x + 2685;
+        }
+        else if(state == 3){
+            box_x = 4559;//4659から
+            box_y = 2292;//2192から
+        }
+        else if(state == 4){
+            incre_x = 220;//185から
+        }
+        else if(state == 8){
+            incre_x = -220;
+        }
+        else if(state == 11){
+            box_x = -2367;//-2567から
+            box_y = 2192;
+        }
+        else if(state == 12) {
+            incre_x = -220;
+        }
+        else if(state == 16){
+            incre_x = 220;
+        }*/
+    }
+    else if(move_flag_x == 1 && move_flag_y == 1 && leave_flag == true){
+        PS.Vib(1);
+        enc_flag_x = 0;
+        enc_flag_y = 0;
+        leave.reset();
+        leave.start();
+        PID(0,0,0,0);
+        PID_x(0,0,0,0);
+        PID_y(0,0,0,0);
+//        mode_arm = !mode_arm;
+        ac_mode = false;
+//        move_mode = true;
+        move_mode = false;
+        manual_mode = true;
+        move_flag_x = 0;
+        move_flag_y = 0;
+        leave_flag = !leave_flag;
+        move_x = move_x + cond_move_x;
+        AIM_x = move_x;
+        move_y = move_y + cond_move_y;
+        AIM_y = move_y;
+        state++;
+        duty_flag = 0;
+        if(state == 1){
+            cond_move_x = -4536;
+            cond_move_y = 0;
+        }
+        if(state == 2){
+            cond_move_x = 648;
+        }
+        if(state == 5){
+            cond_move_x = 0;
+            cond_move_y = -588;//-618
+        }
+        if(state == 6){
+            cond_move_x = -648;
+            cond_move_y = -30;
+        }
+        if(state == 7){
+        	cond_move_y = 0;
+        }
+        if(state == 9){
+            cond_move_x = 2592;
+            cond_move_y = 618;
+        }
+        if(state == 10){
+            cond_move_x = 648;
+            cond_move_y = 0;
+        }
+        if(state == 12){
+            cond_move_y = -638;//618
+        }
+        if(state == 13){
+            cond_move_x = -648;
+            cond_move_y = 0;
+        }
+        if(state == 16){
+            cond_move_x = 648;
+            cond_move_y = -718;//-618
+        }
+        if(state == 17){
+            cond_move_x = -648;
+            cond_move_y = 0;
+        }
+/*        if(state == 1){
+            cond_move_x = 4536;
+            cond_move_y = 0;
+        }
+        if(state == 2){
+            cond_move_x = -648;
+        }
+        if(state == 5){
+            cond_move_x = 0;
+            cond_move_y = -618;
+        }
+        if(state == 6){
+            cond_move_x = 648;
+            cond_move_y = 0;
+        }
+        if(state == 9){
+            cond_move_x = -2592;
+            cond_move_y = 618;
+        }
+        if(state == 10){
+            cond_move_x = -648;
+            cond_move_y = 0;
+        }
+        if(state == 12){
+            cond_move_y = -638;//618
+        }
+        if(state == 13){
+            cond_move_x = 648;
+            cond_move_y = 0;
+        }
+        if(state == 16){
+            cond_move_x = 0;
+            cond_move_y = -718;//-618
+        }
+        if(state == 17){
+            cond_move_x = 648;
+            cond_move_y = 0;
+        }*/
+/*        if(state == 3){
+            cond_move_x = -648;
+            cond_move_y = 738; //748から
+        }
+        else if(state == 4){
+            cond_move_x = 648;
+            cond_move_y = 0;
+        }
+        else if(state == 7){
+            cond_move_x = 0;
+            cond_move_y = 618; //748
+        }
+        else if(state == 8){
+            cond_move_x = -648;
+            cond_move_y = 0;
+        }
+        else if(state == 15){
+            cond_move_x = 0;
+            cond_move_y = -618;
+        }
+        else if(state == 16){
+            cond_move_x = 648;
+            cond_move_y = 0;
+        }*/
+        else if(state == 20){
+            move_mode = false;
+        }
+//        pc.printf("アイアムひあー！！！\r\n");
+    }
+//    printf(" %f %f\r\n",duty_x,duty_y);
+}
+
+void manual_leave(){
+    if(PS.BUTTON.BIT.UP == 1){            //十字キーでx,y方向の微調整
+        mt_y = 0.35;
+    }
+    else if(PS.BUTTON.BIT.DOWN == 1){
+        mt_y = 0.65;
+    }
+    else if(PS.BUTTON.BIT.LEFT == 1){
+        mt_x = 0.35;
+    }
+    else if(PS.BUTTON.BIT.RIGHT == 1){
+        mt_x = 0.65;
+    }
+    else{
+        mt_x = 0.5;
+        mt_y = 0.5;
+        mt_z = 0.5;
+    }
+
+    if(PS.BUTTON.BIT.SANKAKU == 1){
+        mt_z = 0.62;
+    }
+    else if(PS.BUTTON.BIT.BATU == 1){
+        mt_z = 0.4;
+    }
+
+    if(PS.BUTTON.BIT.SIKAKU == 1 && PS.PREV.BUTTON.BIT.SIKAKU == 0){
+        mode_arm = false;
+        move_mode = true;
+        manual_mode = false;
+        if(state == 20){
+            move_mode = false;
+        }
+    }
+}
