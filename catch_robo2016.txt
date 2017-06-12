@@ -1,19 +1,33 @@
 //分かんないところはきいてください。
 
-/*注意　これはmbed(arduinoみたいなマイコンの一種)用に書かれています。arduinoはarduinoリファレンス「http://www.musashinodenpa.com/arduino/ref/」などを参考にしてください。*/
-/* 自動モードが入っているので煩雑になっています。単純なプログラムなどはdevice plusの第11回 Arduinoでモーターを制御する！（その１）モーターの基本を勉強してみる。http://deviceplus.jp/hobby/entry011/を参考にしてみてください。*/
-/*たとえばPS.BUTTON.BIT.SELECT == 1 && PS.PREV.BUTTON.BIT.SELECT == 0はselectボタンが前のループでは押されてなくて今回押されたとき(つまり押された瞬間)を表す。
-/*PWMX　に値(0～1)を代入するとモーターが回り出す。0.5で停止、0～0.5で正回転、0.5～1.0で逆回転→MD(モータードライバ)によって違う
+/*注意　これはmbed(arduinoみたいなマイコンの一種)用に書かれています。
+arduinoはarduinoリファレンス「http://www.musashinodenpa.com/arduino/ref/」などを参考にしてください。
+
+/* 自動モードが入っているので煩雑になっています。
+単純なプログラムなどはdevice plusの第11回 Arduinoでモーターを制御する！（その１）モーターの基本を勉強してみる。
+http://deviceplus.jp/hobby/entry011/
+を参考にしてみてください。*/
+
+/*たとえばPS.BUTTON.BIT.SELECT == 1 && PS.PREV.BUTTON.BIT.SELECT == 0は
+selectボタンが前のループでは押されてなくて今回押されたとき(つまり押された瞬間)を表す。
+
+/*PWMX　に値(0～1)を代入するとモーターが回り出す。
+0.5で停止、0～0.5で正回転、0.5～1.0で逆回転→MD(モータードライバ)によって違う
+
 /*今回使う予定のMDのコマンド
 irf3205使用MD
 https://ja.aliexpress.com/item/New-3-36V-Dual-15A-H-Bridge-DC-Motor-Driver-Peak-30A-IRF3205-for-Robot-Smart/32695422278.html?spm=2114.52010608.4.2.poHSBP
-dirはデジタル入力ピン→arduinoではdigitalWrite、pwmはアナログ入力ピン→arduinoではanalogWrite
+dirはデジタル入力ピン→arduinoではdigitalWrite、
+pwmはアナログ入力ピン→arduinoではanalogWrite
 モーター正:　dir = 1 pwm = pwm
 モーター逆: dir = 0 pwm = pwm
 ストップブレーキ: dir = 任意 pwm = 0*/
-/*サーボモーターは使っていません。サーボの制御はhttp://deviceplus.jp/hobby/entry057/を参考に*/
+
+/*サーボモーターは使っていません。
+サーボの制御はhttp://deviceplus.jp/hobby/entry057/を参考に*/
 
 //エンコーダの値は100で2mmほど、エンコーダ…モーターの角度を検出する装置
+
 #include <mbed.h>//mbed…arduinoみたいなもの、mbed用の標準ライブラリ
 #include <init.h>//mbed用の自作mainboardを使うためのライブラリ
 #include <pspad.h>//pspadを動かすためのライブラリ
