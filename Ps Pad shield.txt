@@ -1,0 +1,144 @@
+//PS Pad shield　使い方
+//例文①
+
+/*ジョイスティックの値を表示する*/
+#include <Shield_PS2.h>
+
+//declare class objects
+PS2 ps2=PS2();                    //PS2 class object: ps2
+
+#define LEDPIN 13
+
+
+void setup()
+{
+
+   ps2.init(9600, 2, 3);   //initialize the main board to use desired (baudrate, rx, tx)
+                           //for Arduino Mega use RX:10, TX: 11 for software serial
+                           //for Arduino Leonardo use pin 8, 9, 10, 11 as RX and TX for software serial
+
+  Serial.begin(9600);      // 9600bpsでシリアルポートを開く
+
+}
+
+void loop()
+{
+   Serial.print("lx");
+   Serial.print(ps2.getval(p_joy_lx));//
+   Serial.print("\t");
+   Serial.print("ly");
+   Serial.print(ps2.getval(p_joy_ly));
+   Serial.print("\t");
+   Serial.print("rx");
+   Serial.print(ps2.getval(p_joy_rx));
+   Serial.print("\t");
+   Serial.print("ry");
+   Serial.print(ps2.getval(p_joy_ry));
+   Serial.print("\n");
+}
+
+
+//例文②
+
+/*ボタンを押してLED点灯*/
+#include <Shield_PS2.h>
+
+//declare class objects
+PS2 ps2=PS2();                    //PS2 class object: ps2
+
+#define LEDPIN 13
+
+
+void setup()
+{
+
+   ps2.init(9600, 2, 3);   //initialize the main board to use desired (baudrate, rx, tx)
+                           //for Arduino Mega use RX:10, TX: 11 for software serial
+                           //for Arduino Leonardo use pin 8, 9, 10, 11 as RX and TX for software serial
+
+
+   pinMode(LEDPIN, OUTPUT);
+   digitalWrite(LEDPIN,LOW);
+
+}
+
+void loop()
+{
+
+  if( ps2.getval(p_circle)==0)      //LED on Main Board will light up if Select button is pressed
+  {
+    digitalWrite(LEDPIN,HIGH);
+  }
+  else
+  {
+    digitalWrite(LEDPIN,LOW);
+  }
+ }
+
+
+//キーワード集
+/*
+#######################################
+# Syntax Coloring Map For Matrix
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+PS2		 KEYWORD1
+
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+*/
+
+init 		KEYWORD2
+getval	 	KEYWORD2
+getall	 	KEYWORD2
+vibrate 		KEYWORD2
+reset	 	KEYWORD2
+
+
+ps_data		KEYWORD2
+SERIAL_ERR　 KEYWORD2
+
+/*
+#######################################
+# Constants (LITERAL1)
+#######################################
+*/
+p_select 	LITERAL1
+p_joyl 	 	LITERAL1
+p_joyr 		LITERAL1
+p_start 		LITERAL1
+p_up		LITERAL1
+p_right 		LITERAL1
+p_down		LITERAL1
+p_left		LITERAL1
+p_l2		LITERAL1
+p_r2		LITERAL1
+p_l1		LITERAL1
+p_r1		LITERAL1
+p_triangle	LITERAL1
+p_circle	　　　　LITERAL1
+p_cross		LITERAL1
+p_square	LITERAL1
+p_joy_lx		LITERAL1
+p_joy_ly		LITERAL1
+p_joy_rx		LITERAL1
+p_joy_ry		LITERAL1
+p_joy_lu		LITERAL1
+p_joy_ld		LITERAL1
+p_joy_11		LITERAL1
+p_joy_lr		LITERAL1
+p_joy_ru		LITERAL1
+p_joy_rd		LITERAL1
+p_joy_rl		LITERAL1
+p_joy_rr		LITERAL1
+
+p_con_status		LITERAL1
+p_motor1		LITERAL1
+p_motor2		LITERAL1
+p_btn_joy		LITERAL1
