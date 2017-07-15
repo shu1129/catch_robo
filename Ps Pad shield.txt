@@ -21,6 +21,18 @@ void setup()
 
 }
 
+/*
+http://mathrax.sakura.ne.jp/mathrax_com/ws/page03.html
+void setup
+・最初の一回だけ行いたいことを書く
+・void　→　実行しても値を返す
+*/
+/*
+http://garretlab.web.fc2.com/arduino/inside/arduino/wiring.c/init.html
+init()
+
+*/
+
 void loop()
 {
    Serial.print("lx");
@@ -37,7 +49,15 @@ void loop()
    Serial.print("\n");
 }
 
+/*
+http://mathrax.sakura.ne.jp/mathrax_com/ws/page03.html
+void loop
+・ずっと繰り返したいことを書く
+・void　→　実行しても値を返す
+*/
 
+//-----------------------------------------------------------------
+//-----------------------------------------------------------------
 //例文②
 
 /*ボタンを押してLED点灯*/
