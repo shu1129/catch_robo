@@ -1,0 +1,194 @@
+//PS Pad shield　使い方
+//例文①
+
+/*ジョイスティックの値を表示する*/
+#include <Shield_PS2.h>
+/*
+https://github.com/open-electronics/SnowPlowRobot/tree/master/PS2Library/Shield_PS2
+・Shield_PS2.hのgithub
+*/
+
+//declare class objects
+PS2 ps2=PS2();                    //PS2 class object: ps2
+
+#define LEDPIN 13
+
+
+void setup()
+{
+
+   ps2.init(9600, 2, 3);   //initialize the main board to use desired (baudrate, rx, tx)
+                           //for Arduino Mega use RX:10, TX: 11 for software serial
+                           //for Arduino Leonardo use pin 8, 9, 10, 11 as RX and TX for software serial
+
+  Serial.begin(9600);      // 9600bpsでシリアルポートを開く
+
+}
+
+/*
+http://mathrax.sakura.ne.jp/mathrax_com/ws/page03.html
+void setup
+・最初の一回だけ行いたいことを書く
+・void　→　実行しても値を返す
+*/
+
+/*
+http://garretlab.web.fc2.com/arduino/inside/arduino/wiring.c/init.html
+init()
+・ATmega328Pのタイマ/カウンタとAD変換器、シリアル通信の初期化を行います。
+*/
+
+/*
+http://www.musashinodenpa.com/arduino/ref/index.php?f=0&pos=3185
+・シリアル通信のデータ転送レートをbpsで指定する
+*/
+
+void loop()
+{
+   Serial.print("lx");
+   Serial.print(ps2.getval(p_joy_lx));//
+   Serial.print("\t");
+   Serial.print("ly");
+   Serial.print(ps2.getval(p_joy_ly));
+   Serial.print("\t");
+   Serial.print("rx");
+   Serial.print(ps2.getval(p_joy_rx));
+   Serial.print("\t");
+   Serial.print("ry");
+   Serial.print(ps2.getval(p_joy_ry));
+   Serial.print("\n");
+}
+
+/*
+http://mathrax.sakura.ne.jp/mathrax_com/ws/page03.html
+void loop
+・ずっと繰り返したいことを書く
+・void　→　実行しても値を返す
+*/
+
+//-----------------------------------------------------------------
+//-----------------------------------------------------------------
+//例文②
+
+/*ボタンを押してLED点灯*/
+#include <Shield_PS2.h>
+
+//declare class objects
+PS2 ps2=PS2();                    //PS2 class object: ps2
+
+#define LEDPIN 13
+
+
+void setup()
+{
+
+   ps2.init(9600, 2, 3);   //initialize the main board to use desired (baudrate, rx, tx)
+                           //for Arduino Mega use RX:10, TX: 11 for software serial
+                           //for Arduino Leonardo use pin 8, 9, 10, 11 as RX and TX for software serial
+
+
+   pinMode(LEDPIN, OUTPUT);
+   digitalWrite(LEDPIN,LOW);
+
+}
+
+/*
+http://www.musashinodenpa.com/arduino/ref/index.php?f=0&pos=2014
+・pinMode
+・ピンの動作を入力か出力に設定します。
+Arduino 1.0.1から、INPUT_PULLUPを指定することで、内部プルアップ抵抗を有効にできます。
+INPUTを指定すると、内部プルアップは無効となります。
+*/
+
+/*
+http://www.musashinodenpa.com/arduino/ref/index.php?f=0&pos=2051
+・digitalWrite
+・highまたはlowを指定したピンに出力
+指定したピンがpinMode()関数でOUTPUTに設定されている場合は、
+次の電圧にセットされます。
+HIGH = 5V (3.3Vのボードでは3.3V)
+LOW = 0V (GND)
+指定したピンがINPUTに設定されている場合は、HIGHを出力すると20KΩの内部プルアップ抵抗が有効になり、LOWで無効になります。
+通常は pinMode()で INPUT_PULLUPを指定してください。
+*/
+
+void loop()
+{
+
+  if( ps2.getval(p_circle)==0)      //LED on Main Board will light up if Select button is pressed
+  {
+    digitalWrite(LEDPIN,HIGH);
+  }
+  else
+  {
+    digitalWrite(LEDPIN,LOW);
+  }
+ }
+
+
+//キーワード集
+/*
+#######################################
+# Syntax Coloring Map For Matrix
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+PS2		 KEYWORD1
+
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+*/
+
+init 		KEYWORD2
+getval	 	KEYWORD2
+getall	 	KEYWORD2
+vibrate 		KEYWORD2
+reset	 	KEYWORD2
+
+
+ps_data		KEYWORD2
+SERIAL_ERR　 KEYWORD2
+
+/*
+#######################################
+# Constants (LITERAL1)
+#######################################
+*/
+p_select 	LITERAL1
+p_joyl 	 	LITERAL1
+p_joyr 		LITERAL1
+p_start 		LITERAL1
+p_up		LITERAL1
+p_right 		LITERAL1
+p_down		LITERAL1
+p_left		LITERAL1
+p_l2		LITERAL1
+p_r2		LITERAL1
+p_l1		LITERAL1
+p_r1		LITERAL1
+p_triangle	LITERAL1
+p_circle	　　　　LITERAL1
+p_cross		LITERAL1
+p_square	LITERAL1
+p_joy_lx		LITERAL1
+p_joy_ly		LITERAL1
+p_joy_rx		LITERAL1
+p_joy_ry		LITERAL1
+p_joy_lu		LITERAL1
+p_joy_ld		LITERAL1
+p_joy_11		LITERAL1
+p_joy_lr		LITERAL1
+p_joy_ru		LITERAL1
+p_joy_rd		LITERAL1
+p_joy_rl		LITERAL1
+p_joy_rr		LITERAL1
+
+p_con_status		LITERAL1
+p_motor1		LITERAL1
+p_motor2		LITERAL1
+p_btn_joy		LITERAL1
