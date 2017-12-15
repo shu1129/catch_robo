@@ -1,0 +1,571 @@
+      //http://tetsuakibaba.jp/index.php?page=workshop/ServoBasis/main
+      
+      #include <Shield_PS2.h>
+      #include <SoftwareSerial.h>
+      #include <Servo.h>
+      #include <FlexiTimer2.h>
+    
+      PS2 ps2=PS2();
+      
+      Servo horizontal_left;
+      Servo vertical_left;
+      Servo horizontal_right;
+      Servo vertical_right;
+      Servo box_pusher_left;
+      Servo box_pusher_right;
+      Servo work_pusher_left;
+      Servo work_pusher_right;
+      Servo box_closer_left1;
+      Servo box_closer_left2;
+      Servo box_closer_right1;
+      Servo box_closer_right2;
+
+    
+      int ang_horizontal_left;
+      int ang_vertical_left;
+      int ang_horizontal_right;
+      int ang_vertical_right;
+      int ang_box_pusher_left;
+      int ang_box_pusher_right;
+      int ang_work_pusher_left;
+      int ang_work_pusher_right;
+      int ang_box_closer_left1;
+      int ang_box_closer_left2;
+      int ang_box_closer_right1;
+      int ang_box_closer_right2;
+
+      int ang_min_G = 700;
+      int ang_max_G = 2300;
+
+      int delta_box_ang_G = 50;
+      int delta_work_ang_G = 100;
+
+      int horizontal_vertical_left_count = 0;
+      int horizontal_vertical_right_count = 0;
+      int box_pusher_left_count = 0;
+      int box_pusher_right_count = 0;
+      int work_pusher_left_count = 0;
+      int work_pusher_right_count = 0;
+      int box_closer_left1_count = 0;
+      int box_closer_left2_count = 0;
+      int box_closer_right1_count = 0;
+      int box_closer_right2_count = 0;
+
+      int work_slider_left_button1pre;
+      int work_slider_left_button2pre;
+      int work_slider_right_button1pre;
+      int work_slider_right_button2pre;
+      int box_pusher_left_button1pre;
+      int box_pusher_left_button2pre;
+      int box_pusher_right_button1pre;
+      int box_pusher_right_button2pre;
+      int work_pusher_left_button1pre;
+      int work_pusher_left_button2pre;
+      int work_pusher_right_button1pre;
+      int work_pusher_right_button2pre;
+      int box_closer_left1_buttonpre;
+      int box_closer_left2_buttonpre;
+      int box_closer_right1_buttonpre;
+      int box_closer_right2_buttonpre;
+
+      int work_slider_left_button1;
+      int work_slider_left_button2;
+      int work_slider_right_button1;
+      int work_slider_right_button2;
+      int box_pusher_left_button1;
+      int box_pusher_left_button2;
+      int box_pusher_right_button1;
+      int box_pusher_right_button2;
+      int work_pusher_left_button1;
+      int work_pusher_left_button2;
+      int work_pusher_right_button1;
+      int work_pusher_right_button2;
+      int box_closer_left1_button;
+      int box_closer_left2_button;
+      int box_closer_right1_button;
+      int box_closer_right2_button;
+
+      int time_horizontal_left;
+      int time_vertical_left;
+      int time_horizontal_right;
+      int time_vertical_right;
+      int time_box_pusher_left;
+      int time_box_pusher_right;
+      int time_work_pusher_left;
+      int time_work_pusher_right;
+      int time_box_closer_left1;
+      int time_box_closer_left2;
+      int time_box_closer_right1;
+      int time_box_closer_right2;
+    
+      int t = 0;
+    
+      void setup(){
+        ps2.init(9600, 0, 1);
+        Serial.begin(9600);
+        //ps2.init(9600, 0, 1);
+        //0,1番に割り当てる時はarduinoの書き込み時にシールドを外して行う。
+
+        horizontal_left.attach(4, 700, 2300);
+        vertical_left.attach(5, 700, 2300);
+        horizontal_right.attach(2, 700, 2300);
+        vertical_right.attach(3, 700, 2300);
+        box_pusher_left.attach(6, 700, 2300);
+        box_pusher_right.attach(7, 700, 2300);
+        work_pusher_left.attach(8, 700, 2300);
+        work_pusher_right.attach(9, 700, 2300);
+        box_closer_left1.attach(10, 700, 2300);
+        box_closer_left2.attach(11, 700, 2300);
+        box_closer_right1.attach(12, 700, 2300);
+        box_closer_right2.attach(13, 700, 2300);     
+
+        ang_box_pusher_left = 1000;
+        ang_box_pusher_right = 2000;
+
+        ang_work_pusher_left = 1500;
+        ang_work_pusher_right = 1500;
+
+        time_horizontal_left = 1;
+        time_vertical_left = 1;
+        time_horizontal_right = 1;
+        time_vertical_right = 1;
+        time_box_pusher_left = 1;
+        time_box_pusher_right = 1;
+        time_work_pusher_left = 1;
+        time_work_pusher_right = 1;
+        time_box_closer_left1 = 1;
+        time_box_closer_left2 = 1;
+        time_box_closer_right1 = 1;
+        time_box_closer_right2 = 1;
+
+        horizontal_left.writeMicroseconds( 1400 );
+        vertical_left.writeMicroseconds( 1400 );
+        horizontal_right.writeMicroseconds( 1500 );
+        vertical_right.writeMicroseconds( 1400 );
+        box_pusher_left.writeMicroseconds( 1000 );
+        box_pusher_right.writeMicroseconds( 2000 );
+        work_pusher_left.writeMicroseconds( 1500 );
+        work_pusher_right.writeMicroseconds( 1500 );
+        box_closer_left1.writeMicroseconds( 1000 );
+        box_closer_left2.writeMicroseconds( 1500 );
+        box_closer_right1.writeMicroseconds( 1700 );
+        box_closer_right2.writeMicroseconds( 1500 );    
+    
+        //FlexiTimer2::set(100, flash); // 500ms period
+        //FlexiTimer2::start();
+      }
+    
+      void loop() {
+        work_slider_left_button1 = ps2.getval(p_left);
+        work_slider_left_button2 = ps2.getval(p_right);
+        work_slider_right_button1 = ps2.getval(p_circle);
+        work_slider_right_button2 = ps2.getval(p_square);
+        box_pusher_left_button1 = ps2.getval(p_l1);
+        box_pusher_left_button2 = ps2.getval(p_l2);
+        box_pusher_right_button1 = ps2.getval(p_r1);
+        box_pusher_right_button2 = ps2.getval(p_r2);
+        work_pusher_left_button1 = ps2.getval(p_up);
+        work_pusher_left_button2 = ps2.getval(p_down);
+        work_pusher_right_button1 = ps2.getval(p_cross);
+        work_pusher_right_button2 = ps2.getval(p_triangle);
+        box_closer_left1_button = ps2.getval(p_select);
+        box_closer_left2_button = ps2.getval(p_joyl);
+        box_closer_right1_button = ps2.getval(p_start);
+        box_closer_right2_button = ps2.getval(p_joyr);
+        
+        if( work_slider_left_button1 == 0 && work_slider_left_button1pre == 1 )
+          {
+              horizontal_vertical_left_count = count_plus( -2, 2, horizontal_vertical_left_count );
+          }
+        else if( work_slider_left_button2 == 0 && work_slider_left_button2pre == 1 )
+          {
+              horizontal_vertical_left_count = count_minus( -2, 2, horizontal_vertical_left_count );
+          }
+        else if( work_slider_right_button1 == 0 && work_slider_right_button1pre == 1 )
+          {
+              horizontal_vertical_right_count = count_plus( -2, 2, horizontal_vertical_right_count );
+          }
+        else if( work_slider_right_button2 == 0 && work_slider_right_button2pre == 1 )
+          {
+              horizontal_vertical_right_count = count_minus( -2, 2, horizontal_vertical_right_count );
+          }
+        else if( box_pusher_left_button1 == 0 && box_pusher_left_button1pre == 1 )
+          {
+              ang_box_pusher_left = ang_plus( ang_min_G, ang_max_G, ang_box_pusher_left, delta_box_ang_G );
+          }
+        else if( box_pusher_left_button2 == 0 && box_pusher_left_button2pre == 1 )
+          {
+              ang_box_pusher_left = ang_minus( ang_min_G, ang_max_G, ang_box_pusher_left, delta_box_ang_G );
+          }
+        else if( box_pusher_right_button1 == 0 && box_pusher_right_button1pre == 1 )
+          {
+              ang_box_pusher_right = ang_plus( ang_min_G, ang_max_G, ang_box_pusher_right, delta_box_ang_G );
+          }
+        else if( box_pusher_right_button2 == 0 && box_pusher_right_button2pre == 1 )
+          {
+              ang_box_pusher_right = ang_minus( ang_min_G, ang_max_G, ang_box_pusher_right, delta_box_ang_G );
+          }
+        else if( work_pusher_left_button1 == 0 && work_pusher_left_button1pre == 1 )
+          {
+              ang_work_pusher_left = ang_plus( ang_min_G, ang_max_G, ang_work_pusher_left, delta_work_ang_G );
+          }
+        else if( work_pusher_left_button2 == 0 && work_pusher_left_button2pre == 1 )
+          {
+              ang_work_pusher_left = ang_minus( ang_min_G, ang_max_G, ang_work_pusher_left, delta_work_ang_G );
+          }
+        else if( work_pusher_right_button1 == 0 && work_pusher_right_button1pre == 1 )
+          {
+              ang_work_pusher_right = ang_plus( ang_min_G, ang_max_G, ang_work_pusher_right, delta_work_ang_G );
+          }
+        else if( work_pusher_right_button2 == 0 && work_pusher_right_button2pre == 1 )
+          {
+              ang_work_pusher_right = ang_minus( ang_min_G, ang_max_G, ang_work_pusher_right, delta_work_ang_G );
+          }
+        else if( box_closer_left1_button == 0 && box_closer_left1_buttonpre == 1 )
+          {
+              box_closer_left1_count = count_plus( -1, 1, box_closer_left1_count );
+          }
+        else if( box_closer_left2_button == 0 && box_closer_left2_buttonpre == 1 )
+          {
+              box_closer_left2_count = count_plus( -1, 2, box_closer_left2_count );
+          }
+        else if( box_closer_right1_button == 0 && box_closer_right1_buttonpre == 1 )
+          {
+              box_closer_right1_count = count_plus( -1, 1, box_closer_right1_count );
+          }
+        else if( box_closer_right2_button == 0 && box_closer_right2_buttonpre == 1 )
+          {
+              box_closer_right2_count = count_plus( -1, 2, box_closer_right2_count );
+          }
+        else
+          {
+          }
+          
+        horizontal_vertical_left_action();
+        box_closer_left1_action();
+        box_closer_left2_action();
+        speed_controll( ang_box_pusher_left, time_box_pusher_left, box_pusher_left );
+        speed_controll( ang_work_pusher_left, time_work_pusher_left, work_pusher_left );
+
+        horizontal_vertical_right_action();
+        box_closer_right1_action();
+        box_closer_right2_action();
+        speed_controll( ang_box_pusher_right, time_box_pusher_right, box_pusher_right );
+        speed_controll( ang_work_pusher_right, time_work_pusher_right, work_pusher_right );
+          
+        delay(t);
+
+        work_slider_left_button1pre = work_slider_left_button1;
+        work_slider_left_button2pre = work_slider_left_button2;
+        work_slider_right_button1pre = work_slider_right_button1;
+        work_slider_right_button2pre = work_slider_right_button2;
+        box_pusher_left_button1pre = box_pusher_left_button1;
+        box_pusher_left_button2pre = box_pusher_left_button2;
+        box_pusher_right_button1pre = box_pusher_right_button1;
+        box_pusher_right_button2pre = box_pusher_right_button2;
+        work_pusher_left_button1pre = work_pusher_left_button1;
+        work_pusher_left_button2pre = work_pusher_left_button2;
+        work_pusher_right_button1pre = work_pusher_right_button1;
+        work_pusher_right_button2pre = work_pusher_right_button2;
+        box_closer_left1_buttonpre = box_closer_left1_button;
+        box_closer_left2_buttonpre = box_closer_left2_button;
+        box_closer_right1_buttonpre = box_closer_right1_button;
+        box_closer_right2_buttonpre = box_closer_right2_button;
+      }
+      
+      void horizontal_vertical_left_action()
+      {
+        switch(horizontal_vertical_left_count)
+        {
+
+        case -2:
+        horizontal_vertical_left_count = -1;
+        break;
+        
+        case -1:      
+        ang_horizontal_left = 1430;//1250;
+        ang_vertical_left = 900;
+        speed_controll( ang_vertical_left, time_vertical_left, vertical_left );
+        speed_controll( ang_horizontal_left, time_horizontal_left, horizontal_left );       
+        break;
+        
+        case 0:   
+        ang_horizontal_left = 1430;//1430;
+        ang_vertical_left = 1400;
+        speed_controll( ang_vertical_left, time_vertical_left, vertical_left );
+        speed_controll( ang_horizontal_left, time_horizontal_left, horizontal_left );      
+        break;
+  
+        case 1:
+        ang_horizontal_left = 1430;//1750;
+        ang_vertical_left = 900;
+        speed_controll( ang_vertical_left, time_vertical_left, vertical_left );
+        speed_controll( ang_horizontal_left, time_horizontal_left, horizontal_left );       
+        break;
+   
+        case 2:
+        horizontal_vertical_left_count = 1;
+        break;
+        
+        }
+      }
+
+      void horizontal_vertical_right_action()
+      {
+        switch(horizontal_vertical_right_count)
+        {
+
+        case 2:
+        horizontal_vertical_right_count = 1;
+        break;
+        
+        case 1:      
+        ang_horizontal_right = 1500;//1700;
+        ang_vertical_right = 700;
+        speed_controll( ang_vertical_right, time_vertical_right, vertical_right );
+        speed_controll( ang_horizontal_right, time_horizontal_right, horizontal_right );    
+        break;
+        
+        case 0:
+        
+        ang_horizontal_right = 1500;
+        ang_vertical_right = 1400;
+        speed_controll( ang_vertical_right, time_vertical_right, vertical_right );
+        speed_controll( ang_horizontal_right, time_horizontal_right, horizontal_right );
+        break;
+  
+        case -1:
+        ang_horizontal_right = 1500;//1300;
+        ang_vertical_right = 700;
+        speed_controll( ang_vertical_right, time_vertical_right, vertical_right );
+        speed_controll( ang_horizontal_right, time_horizontal_right, horizontal_right );  
+        break;
+   
+        case -2:
+        horizontal_vertical_right_count = -1;
+        break;
+        
+        }
+      }
+
+      void box_closer_left1_action()
+      {
+        switch(box_closer_left1_count)
+        {//左、箱を押す
+              
+        case -1:
+        ang_box_closer_left1 = 1700;
+        speed_controll( ang_box_closer_left1, time_box_closer_left1, box_closer_left1 );
+        break;
+        
+        case 0:
+        ang_box_closer_left1 = 1000;
+        speed_controll( ang_box_closer_left1, time_box_closer_left1, box_closer_left1 );
+        break;
+        
+        case 1:
+        ang_box_closer_left1 = 1700;
+        speed_controll( ang_box_closer_left1, time_box_closer_left1, box_closer_left1 );
+        box_closer_left1_count = -1;
+        break;
+  
+        
+        }
+      }
+
+      void box_closer_left2_action()
+      {
+        switch(box_closer_left2_count)
+        {//左、箱を押す
+
+        case -1:
+        ang_box_closer_left2 = 2200;//800;
+        speed_controll( ang_box_closer_left2, time_box_closer_left2, box_closer_left2 );
+        //box_closer_left2.writeMicroseconds(ang_box_closer_left2);
+        break;
+        
+        case 0:
+        ang_box_closer_left2 = 1500;
+        speed_controll( ang_box_closer_left2, time_box_closer_left2, box_closer_left2 );
+        break;
+
+        case 1:
+        ang_box_closer_left2 = 2000;
+        speed_controll( ang_box_closer_left2, time_box_closer_left2, box_closer_left2 );
+        break;
+        
+        case 2:
+        ang_box_closer_left2 = 2200;
+        speed_controll( ang_box_closer_left2, time_box_closer_left2, box_closer_left2 );
+        box_closer_left2_count = -1;
+        break;
+        
+        }
+      }
+
+      void box_closer_right1_action()
+      {
+        switch(box_closer_right1_count)
+        {//左、箱を押す
+              
+        case -1:
+        ang_box_closer_right1 = 1000;
+        speed_controll( ang_box_closer_right1, time_box_closer_right1, box_closer_right1 );
+        break;
+        
+        case 0:
+        ang_box_closer_right1 = 1700;
+        speed_controll( ang_box_closer_right1, time_box_closer_right1, box_closer_right1 );
+        break;
+        
+        case 1:
+        ang_box_closer_right1 = 1000;
+        speed_controll( ang_box_closer_right1, time_box_closer_right1, box_closer_right1 );
+        box_closer_right1_count = -1;
+        break;
+  
+        
+        }
+      }
+
+      void box_closer_right2_action()
+      {
+        switch(box_closer_right2_count)
+        {//左、箱を押す
+
+        case -1:
+        ang_box_closer_right2 = 800;//2200;
+        speed_controll( ang_box_closer_right2, time_box_closer_right2, box_closer_right2 );
+        break;
+        
+        case 0:
+        ang_box_closer_right2 = 1500;
+        speed_controll( ang_box_closer_right2, time_box_closer_right2, box_closer_right2 );
+        break;
+
+        case 1:
+        ang_box_closer_right2 = 1000;
+        speed_controll( ang_box_closer_right2, time_box_closer_right2, box_closer_right2 );
+        break;
+
+        case 2:
+        ang_box_closer_right2 = 800;
+        speed_controll( ang_box_closer_right2, time_box_closer_right2, box_closer_right2 );
+        box_closer_right2_count = -1;
+        break;
+       
+        }
+      }
+
+      void speed_controll(int ang, int time, Servo servo_name)
+      {
+        int ang_now =  servo_name.readMicroseconds();
+
+        if(ang > ang_now)
+        {
+          for(int i = ang_now; i <= ang; i++)
+          {
+            servo_name.writeMicroseconds(i);
+            delay( time );
+          }
+        }
+        else if(ang < ang_now)
+        {
+          for(int i = ang_now; i >= ang; i--)
+          {
+            servo_name.writeMicroseconds(i);
+            delay( time );
+          }
+        }
+        else
+        {
+          //do nothing
+        }
+      }
+
+      int count_plus( int count_min, int count_max, int count_now )
+      {
+        if( count_min <= count_now && count_now <= count_max )
+        {
+          return count_now + 1;
+        }
+        else if( count_now < count_min )
+        {
+          return count_min;
+        }
+        else if( count_max < count_now )
+        {
+          return count_max;
+        }
+        else
+        {
+          
+        }
+      }
+
+      int count_minus( int count_min, int count_max, int count_now )
+      {
+        if( count_min <= count_now && count_now <= count_max )
+        {
+          return count_now - 1;
+        }
+        else if( count_now < count_min )
+        {
+          return count_min;
+        }
+        else if( count_max < count_now )
+        {
+          return count_max;
+        }
+        else
+        {
+          
+        }
+      }
+
+      int ang_plus( int ang_min, int ang_max, int ang_now, int delta_ang )
+      {
+        if( ang_min <= ang_now && ang_now <= ang_max )
+        {
+          return ang_now + delta_ang;
+        }
+        else if( ang_now < ang_min )
+        {
+          return ang_min;
+        }
+        else if( ang_max < ang_now )
+        {
+          return ang_max;
+        }
+        else
+        {
+          
+        }
+      }
+
+      int ang_minus( int ang_min, int ang_max, int ang_now, int delta_ang )
+      {
+        if( ang_min <= ang_now && ang_now <= ang_max )
+        {
+          return ang_now - delta_ang;
+        }
+        else if( ang_now < ang_min )
+        {
+          return ang_min;
+        }
+        else if( ang_max < ang_now )
+        {
+          return ang_max;
+        }
+        else
+        {
+          
+        }
+      }
+    
+      /*void flash() 
+      {
+        static boolean output = HIGH;
+        Serial.println(output);
+        output = !output;
+      }*/
